@@ -1,1 +1,1 @@
-web: python image_extraction_pipeline.py start_data/
+web: python start.py
