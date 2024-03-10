@@ -12,6 +12,8 @@ load_dotenv()
 
 #################### CONFIG ####################
 
+DEFAULT_OUTPUT_DIR = "output_figures"
+
 NUM_ADDITIONAL_ELEMENTS_TO_LOOK_FOR_CAPTIONS = 7
 
 def get_element_json_from_pdf(file_filename):
@@ -223,23 +225,79 @@ def process_full_pdf(pdf_filepath, OUTPUT_DIR="output_figures"):
     results = process_json_from_pdf(pdf_filepath, response_json, OUTPUT_DIR=OUTPUT_DIR)
     return results
 
+
 ############################################################
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import os
+import sys
+
+MAX_WORKERS = 8
+
+def process_pdf_wrapper(args):
+    """
+    Wrapper function to pass multiple arguments to process_full_pdf function.
+    """
+    pdf_filepath, OUTPUT_DIR = args
+    try:
+        process_full_pdf(pdf_filepath, OUTPUT_DIR=OUTPUT_DIR)
+        print(f"Successfully processed {pdf_filepath}")
+    except Exception as e:
+        print(f"Error processing {pdf_filepath}. Error: {e}")
+
 if __name__ == "__main__":
     input_path = sys.argv[1]
+    OUTPUT_DIR = sys.argv[2] if len(sys.argv) > 2 else "output_figures"
+    max_workers = MAX_WORKERS
+    pdf_filepaths = []
 
-    ## Directory 
+    ## Directory
     if os.path.isdir(input_path):
         for filename in os.listdir(input_path):
             if filename.endswith(".pdf"):
                 pdf_filepath = os.path.join(input_path, filename)
-                print(f"Processing {pdf_filepath}...")
-                process_full_pdf(pdf_filepath)
+                pdf_filepaths.append((pdf_filepath, OUTPUT_DIR))
 
     ## Single file
     elif os.path.isfile(input_path) and input_path.endswith(".pdf"):
-        process_full_pdf(input_path)
+        pdf_filepaths.append((input_path, OUTPUT_DIR))
 
-    ## Invalid 
+    ## Invalid
     else:
         print("The provided path is not a PDF file or a directory containing PDF files.")
         sys.exit(1)
+
+    # Process PDFs in parallel using ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=min(max_workers, len(pdf_filepaths))) as executor:
+        future_to_pdf = {executor.submit(process_pdf_wrapper, pdf_filepath): pdf_filepath for pdf_filepath in pdf_filepaths}
+        for future in as_completed(future_to_pdf):
+            pdf = future_to_pdf[future]
+            try:
+                future.result()
+            except Exception as exc:
+                print(f"{pdf[0]} generated an exception: {exc}")
+
+############################################################
+# if __name__ == "__main__":
+#     input_path = sys.argv[1]
+#     OUTPUT_DIR = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_OUTPUT_DIR
+
+#     ## Directory 
+#     if os.path.isdir(input_path):
+#         for filename in os.listdir(input_path):
+#             if filename.endswith(".pdf"):
+#                 pdf_filepath = os.path.join(input_path, filename)
+#                 print(f"Processing {pdf_filepath}...")
+#                 try: 
+#                     process_full_pdf(pdf_filepath, OUTPUT_DIR=OUTPUT_DIR)
+#                 except Exception as e:
+#                     print(f"Error processing {pdf_filepath}. Error: {e}")
+
+#     ## Single file
+#     elif os.path.isfile(input_path) and input_path.endswith(".pdf"):
+#         process_full_pdf(input_path, OUTPUT_DIR=OUTPUT_DIR)
+
+#     ## Invalid 
+#     else:
+#         print("The provided path is not a PDF file or a directory containing PDF files.")
+#         sys.exit(1)
+
