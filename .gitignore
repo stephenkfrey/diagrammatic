@@ -1,0 +1,7 @@
+.env
+image_pdf_scraper/
+caption_parser.py
+output_figures/
+sample_data/DL_textbooks
+notes.md
+.DS_STORE
