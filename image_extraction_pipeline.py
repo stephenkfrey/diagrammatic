@@ -230,8 +230,9 @@ def process_full_pdf(pdf_filepath, OUTPUT_DIR="output_figures"):
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
 import sys
+import argparse 
 
-MAX_WORKERS = 8
+DEFAULT_MAX_WORKERS = 8
 
 def process_pdf_wrapper(args):
     """
@@ -245,9 +246,16 @@ def process_pdf_wrapper(args):
         print(f"Error processing {pdf_filepath}. Error: {e}")
 
 if __name__ == "__main__":
-    input_path = sys.argv[1]
-    OUTPUT_DIR = sys.argv[2] if len(sys.argv) > 2 else "output_figures"
-    max_workers = MAX_WORKERS
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="Process PDF files to extract images.")
+    parser.add_argument("input_path", help="Path to the PDF file or directory containing PDF files.")
+    parser.add_argument("--output-dir", default="output_figures", help="Output directory for the extracted images.")
+    parser.add_argument("--max-workers", type=int, default=8, help="Maximum number of worker threads.")
+    args = parser.parse_args()
+
+    input_path = args.input_path
+    OUTPUT_DIR = args.output_dir if args.output_dir else DEFAULT_OUTPUT_DIR
+    max_workers = args.max_workers if args.max_workers else DEFAULT_MAX_WORKERS
     pdf_filepaths = []
 
     ## Directory
