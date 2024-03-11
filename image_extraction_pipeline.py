@@ -166,6 +166,65 @@ def process_figures(pdf_filepath, response_json):
 
     return figure_list
 
+
+
+
+# def process_pdf_directory(directory_path, OUTPUT_DIR):
+#     """
+#     Process all PDFs in the given directory and maintain a single FigureList object
+#     across all PDFs to allow for assigning captions or references from one PDF to another.
+#     """
+#     figure_list = FigureList()  # Initialize a single FigureList for all PDFs
+
+#     # Sort the PDF filenames to ensure they are processed in order
+#     pdf_filenames = sorted([f for f in os.listdir(directory_path) if f.endswith('.pdf')])
+
+#     for pdf_name in pdf_filenames:
+#         pdf_filepath = os.path.join(directory_path, pdf_name)
+#         print(f"Processing {pdf_filepath}...")
+
+#         # Extract the images and texts from the PDF
+#         response_json = get_element_json_from_pdf(pdf_filepath)
+
+#         # Process the figures using the existing logic but pass the shared FigureList
+#         process_figures(pdf_filepath, response_json, figure_list, OUTPUT_DIR)
+
+#     # After processing all PDFs, you can now handle figures at the end of one PDF
+#     # and their captions or references at the start of the next PDF within the shared FigureList
+#     # This is where you can implement logic to match figures and captions across PDF boundaries if necessary
+
+#     # Optionally, save the combined figure list to a JSON file or perform other final actions
+#     save_figure_list_to_json(figure_list, OUTPUT_DIR)
+
+# def process_figures(pdf_filepath, response_json, figure_list, OUTPUT_DIR):
+#     """
+#     Modified process_figures function to accept an existing FigureList object.
+#     """
+#     for i, element in enumerate(response_json["elements"]):
+#         if element["category"] == "figure":
+#             this_figure = Figure(original_doc_filepath=pdf_filepath, image_name=None, image_caption=None, image_descriptions=element["text"], page_number=element["page"], image_coordinates=element.get("bounding_box"), html=element["html"], element_id=element["id"], FigureListObj=figure_list)
+
+#             # Existing logic to process each figure, including setting names and captions
+
+#             figure_list.add_figure(this_figure)
+
+#     # Existing logic to process descriptions for all figures
+
+# def save_figure_list_to_json(figure_list, OUTPUT_DIR):
+#     """
+#     Save the combined figure list to a JSON file.
+#     """
+#     figure_list_dict = [figure.__dict__() for figure in figure_list.figures]
+#     json_filepath = os.path.join(OUTPUT_DIR, "combined_figure_list.json")
+#     with open(json_filepath, "w") as json_file:
+#         json.dump(figure_list_dict, json_file, indent=4)
+#     print(f"Combined figure list saved to {json_filepath}")
+
+# # Example usage
+# # directory_path = "path/to/pdf/directory"
+# # OUTPUT_DIR = "output_figures"
+# # process_pdf_directory(directory_path, OUTPUT_DIR)
+
 # # Example usage
 # file_filename = "sample_data/Attention.pdf"
 # figure_list = process_figures(file_filename, response_json)
@@ -178,6 +237,45 @@ def process_figures(pdf_filepath, response_json):
 
 # for figure in figure_list.figures:
 #     print(f"Figure Name: {figure.image_name}, Caption: {figure.image_caption}")
+
+
+from PyPDF2 import PdfFileReader, PdfFileWriter
+
+def split_pdf_into_chunks(pdf_name, pdf_filepath, OUTPUT_DIR):
+    """
+    Splits the given PDF into chunks of 25 pages each and saves those chunks into the specified output directory.
+    """
+
+    pdf_split_dir = os.path.join(pdf_name, "pdf_split")
+    os.makedirs(os.path.join(OUTPUT_DIR, pdf_split_dir), exist_ok=True) 
+
+    # Open the PDF file
+    with open(pdf_filepath, 'rb') as infile:
+        reader = PdfFileReader(infile)
+        total_pages = reader.numPages
+        
+        # Calculate the number of chunks
+        num_chunks = total_pages // 25 + (1 if total_pages % 25 else 0)
+        
+        # Split and save each chunk
+        for i in range(num_chunks):
+            writer = PdfFileWriter()
+            start_page = i * 25
+            end_page = min(start_page + 25, total_pages)
+            
+            # Add pages to each chunk
+            for page_num in range(start_page, end_page):
+                writer.addPage(reader.getPage(page_num))
+            
+            # Save the chunk to a file
+            chunk_filename = os.path.join(OUTPUT_DIR, f"{pdf_name}_{i+1}.pdf")
+            with open(chunk_filename, 'wb') as outfile:
+                writer.write(outfile)
+            
+            print(f"Saved {chunk_filename}")
+
+
+
 
 ############################################################
 ## Process the PDF and save the figures
@@ -193,11 +291,13 @@ def process_json_from_pdf(pdf_filepath, response_json, OUTPUT_DIR="output_figure
     
     # Define output directories
     diagrams_dir = os.path.join(pdf_name, "diagrams")
+    os.makedirs(os.path.join(OUTPUT_DIR, diagrams_dir), exist_ok=True) 
 
-    os.makedirs(os.path.join(OUTPUT_DIR, diagrams_dir), exist_ok=True)  # Create directories if they don't exist
+    # Call the function to split the PDF
+    # pdf_chunk_filepath = split_pdf_into_chunks(pdf_name, pdf_filepath, OUTPUT_DIR)
 
-    # Process the figures using the existing logic
     figure_list = process_figures(pdf_filepath, response_json)
+
 
     # Save each figure image
     for figure in figure_list.figures:
@@ -223,6 +323,32 @@ def process_full_pdf(pdf_filepath, OUTPUT_DIR="output_figures"):
     response_json = get_element_json_from_pdf(pdf_filepath)
     results = process_json_from_pdf(pdf_filepath, response_json, OUTPUT_DIR=OUTPUT_DIR)
     return results
+
+
+############################################################
+if __name__ == "__main__":
+    input_path = sys.argv[1]
+    OUTPUT_DIR = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_OUTPUT_DIR
+
+    ## Directory 
+    if os.path.isdir(input_path):
+        for filename in os.listdir(input_path):
+            if filename.endswith(".pdf"):
+                pdf_filepath = os.path.join(input_path, filename)
+                print(f"Processing {pdf_filepath}...")
+                try: 
+                    process_full_pdf(pdf_filepath, OUTPUT_DIR=OUTPUT_DIR)
+                except Exception as e:
+                    print(f"Error processing {pdf_filepath}. Error: {e}")
+
+    ## Single file
+    elif os.path.isfile(input_path) and input_path.endswith(".pdf"):
+        process_full_pdf(input_path, OUTPUT_DIR=OUTPUT_DIR)
+
+    ## Invalid 
+    else:
+        print("The provided path is not a PDF file or a directory containing PDF files.")
+        sys.exit(1)
 
 
 ############################################################
@@ -282,29 +408,3 @@ def process_full_pdf(pdf_filepath, OUTPUT_DIR="output_figures"):
 #                 future.result()
 #             except Exception as exc:
 #                 print(f"{pdf[0]} generated an exception: {exc}")
-
-############################################################
-if __name__ == "__main__":
-    input_path = sys.argv[1]
-    OUTPUT_DIR = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_OUTPUT_DIR
-
-    ## Directory 
-    if os.path.isdir(input_path):
-        for filename in os.listdir(input_path):
-            if filename.endswith(".pdf"):
-                pdf_filepath = os.path.join(input_path, filename)
-                print(f"Processing {pdf_filepath}...")
-                try: 
-                    process_full_pdf(pdf_filepath, OUTPUT_DIR=OUTPUT_DIR)
-                except Exception as e:
-                    print(f"Error processing {pdf_filepath}. Error: {e}")
-
-    ## Single file
-    elif os.path.isfile(input_path) and input_path.endswith(".pdf"):
-        process_full_pdf(input_path, OUTPUT_DIR=OUTPUT_DIR)
-
-    ## Invalid 
-    else:
-        print("The provided path is not a PDF file or a directory containing PDF files.")
-        sys.exit(1)
-

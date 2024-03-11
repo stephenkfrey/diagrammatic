@@ -14,9 +14,7 @@ Use for generating books, study guides or videos
     - we could start with open-source Machine Learning Textbooks https://drive.google.com/drive/folders/1xUAKnJ7U0Yz_0G8bhkxurWhE_OmaA67S
     - Here is the master folder of textboooks: https://drive.google.com/drive/u/1/folders/1XpvH5SvwY1BUruGkxZ8EpeekmzhYZhvt 
 
-## 2. Post it on HuggingFace
-
-## 3.  Build a Diagram Retrieval API 
+## 2. Build a Diagram Retrieval API 
 
 - Given any technical/scientific concept, retrieve the top (diagram, caption) pairs to explain it 
 
